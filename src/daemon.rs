@@ -1,8 +1,9 @@
 use crate::{
     config::{Config, Loadable, Sources},
     db::Database,
-    dl::{self, MediaEntry, MediaFile},
+    dl::{self, Media, MediaEntry},
     error::Error,
+    gui,
 };
 use crossbeam_channel::{unbounded, Receiver};
 use log::{error, info};
@@ -11,12 +12,13 @@ use std::{
     collections::VecDeque,
     fs,
     path::PathBuf,
+    sync::Arc,
     thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
 use tokio::task::JoinHandle as Task;
 
-const UPDATE_INTERVAL: u64 = 100;
+const UPDATE_INTERVAL: u64 = 500;
 const DIR_NAME: &str = "drainpipe";
 
 pub struct Daemon {
@@ -26,7 +28,7 @@ pub struct Daemon {
     sources_path: PathBuf,
     fs_event_rx: Receiver<Result<Event, notify::Error>>,
     _watcher: INotifyWatcher,
-    dl_tasks: Vec<JoinHandle<Result<MediaFile, String>>>,
+    dl_tasks: Vec<JoinHandle<Result<Media, String>>>,
     dl_queue: VecDeque<MediaEntry>,
     sync_task: Option<Task<Vec<MediaEntry>>>,
     last_sync: Option<Instant>,
@@ -34,7 +36,7 @@ pub struct Daemon {
 }
 
 impl Daemon {
-    pub fn start() -> Result<Self, Error> {
+    pub async fn start() -> Result<Self, Error> {
         let config_dir = dirs::config_dir().unwrap().join(DIR_NAME);
         fs::create_dir_all(&config_dir)?;
 
@@ -52,7 +54,8 @@ impl Daemon {
 
         let data_dir = dirs::data_dir().unwrap().join(DIR_NAME);
         fs::create_dir_all(&data_dir)?;
-        let db = Database::load(&data_dir.join("library.db"))?;
+        let db = Database::load(&data_dir.join("library.db")).await?;
+        gui::start(config.port, Arc::new(db.clone()));
 
         Ok(Self {
             config,
@@ -84,7 +87,8 @@ impl Daemon {
                 match thread.join().unwrap() {
                     Ok(media) => {
                         info!("Downloaded '{}' to '{}'", media.title, media.path);
-                        self.db.insert(&media)?;
+                        // TODO: Block
+                        self.db.insert(&media).await?;
                     }
                     Err(e) => error!("Download failed: {e}"),
                 }
@@ -112,15 +116,6 @@ impl Daemon {
                 }
             }
 
-            // Start sync
-            if self.last_sync.is_none()
-                && self
-                    .last_sync
-                    .map(|v| v.elapsed().as_secs() > self.config.sync_interval)
-                    .unwrap_or(true)
-            {
-                self.start_sync();
-            }
             // Receive sync
             if let Some(task) = &self.sync_task {
                 if task.is_finished() {
@@ -131,13 +126,24 @@ impl Daemon {
                             if let Some(filter) = &self.config.download_filter {
                                 entries.retain(|e| !filter.filter(e));
                             }
-                            entries.retain(|e| self.db.get(&e.link).unwrap().is_none());
-                            info!("{} new entries added to queue", entries.len());
-                            self.dl_queue.extend(entries);
+                            // Check if not alreaday downloaded
+                            for e in entries {
+                                // TODO: Prevent blocking here
+                                if self.db.get(&e.link).await?.is_none() {
+                                    info!("Add '{}' to queue", e.link);
+                                    self.dl_queue.push_back(e);
+                                }
+                            }
                         }
                         Err(e) => error!("Failed sync: {e}"),
                     }
                 }
+            } else if self
+                .last_sync
+                .map(|v| v.elapsed().as_secs() > self.config.sync_interval)
+                .unwrap_or(true)
+            {
+                self.start_sync();
             }
 
             // Start downloads

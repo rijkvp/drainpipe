@@ -8,12 +8,14 @@ use std::{
 };
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Config {
     pub sync_interval: u64,
     pub parallel_downloads: u64,
     pub media_dir: PathBuf,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub download_filter: Option<DownloadFilter>,
+    pub port: u16,
 }
 
 impl Default for Config {
@@ -22,7 +24,8 @@ impl Default for Config {
             sync_interval: 900,
             parallel_downloads: 1,
             media_dir: dirs::home_dir().unwrap().join("media"),
-            download_filter: Some(DownloadFilter::default()),
+            download_filter: None,
+            port: 9193,
         }
     }
 }
@@ -51,7 +54,7 @@ impl DownloadFilter {
                 }
             }
             if let Some(max_age) = self.max_age {
-                if (Utc::now() - published) > max_age {
+                if Utc::now() - published > max_age {
                     return true;
                 }
             }

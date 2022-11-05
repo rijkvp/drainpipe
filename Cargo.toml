@@ -4,7 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rusqlite = { version = "0.28.0", features = ["bundled"] }
+sqlx = { version = "0.6", features = ["runtime-tokio-native-tls", "sqlite"] }
+mime_guess = "2.0"
+rust-embed = "6.4"
+axum = "0.6.0-rc.2"
 parking_lot = "0.12"
 chrono = { version = "0.4", features = ["serde"] }
 owo-colors = "3.5"

@@ -13,7 +13,7 @@ pub enum Error {
     #[error("Feed parse error: {0}")]
     Feed(#[from] feed_rs::parser::ParseFeedError),
     #[error("Sqlite error: {0}")]
-    Sqlite(#[from] rusqlite::Error),
+    Sqlite(#[from] sqlx::Error),
     #[error("{0}")]
     Custom(String),
 }

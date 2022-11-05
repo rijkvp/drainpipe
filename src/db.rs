@@ -1,15 +1,18 @@
-use crate::{dl::MediaFile, error::Error};
-use rusqlite::{Connection, OptionalExtension};
+use crate::{dl::Media, error::Error};
+use sqlx::{sqlite::SqliteConnectOptions, FromRow, SqlitePool};
 use std::path::Path;
 
+#[derive(Clone)]
 pub struct Database {
-    conn: Connection,
+    pool: SqlitePool,
 }
 
 impl Database {
-    pub fn load(path: &Path) -> Result<Self, Error> {
-        let conn = Connection::open(path)?;
-        conn.execute(
+    pub async fn load(path: &Path) -> Result<Self, Error> {
+        let pool = SqlitePool::connect_with(SqliteConnectOptions::new().filename(path)).await?;
+
+        let mut conn = pool.acquire().await?;
+        sqlx::query(
             "CREATE TABLE IF NOT EXISTS media (
                 source      TEXT PRIMARY KEY NOT NULL,
                 id          TEXT NOT NULL,
@@ -17,46 +20,57 @@ impl Database {
                 title       TEXT,
                 description TEXT
             )",
-            (),
-        )?;
-        Ok(Self { conn })
+        )
+        .execute(&mut conn)
+        .await?;
+
+        Ok(Self { pool })
     }
 
-    pub fn insert(&self, media: &MediaFile) -> Result<(), Error> {
-        self.conn.execute(
+    pub async fn insert(&self, media: &Media) -> Result<(), Error> {
+        let mut conn = self.pool.acquire().await?;
+        sqlx::query(
             "
             INSERT INTO media (source, id, path, title, description)
             VALUES (?1, ?2, ?3, ?4, ?5)
         ",
-            (
-                &media.source,
-                &media.id,
-                &media.path,
-                &media.title,
-                &media.description,
-            ),
-        )?;
+        )
+        .bind(&media.source)
+        .bind(&media.id)
+        .bind(&media.path)
+        .bind(&media.title)
+        .bind(&media.description)
+        .execute(&mut conn)
+        .await?;
+
         Ok(())
     }
 
-    pub fn get(&self, link: &str) -> Result<Option<MediaFile>, Error> {
-        let mut stmt = self.conn.prepare(
+    pub async fn get_all(&self) -> Result<Vec<Media>, Error> {
+        let rows = sqlx::query("SELECT * FROM media")
+            .fetch_all(&self.pool)
+            .await?;
+        let mut res = Vec::new();
+        for row in rows {
+            res.push(Media::from_row(&row)?);
+        }
+        Ok(res)
+    }
+
+    pub async fn get(&self, link: &str) -> Result<Option<Media>, Error> {
+        let row = sqlx::query(
             "
-                SELECT source, id, path, title, description FROM media
+                SELECT * FROM media
                 WHERE source=?
             ",
-        )?;
-        let media = stmt
-            .query_row([link], |row| {
-                Ok(MediaFile {
-                    source: row.get(0)?,
-                    id: row.get(1)?,
-                    path: row.get(2)?,
-                    title: row.get(3)?,
-                    description: row.get(4)?,
-                })
-            })
-            .optional()?;
-        Ok(media)
+        )
+        .bind(link)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(if let Some(row) = row {
+            Some(Media::from_row(&row)?)
+        } else {
+            None
+        })
     }
 }

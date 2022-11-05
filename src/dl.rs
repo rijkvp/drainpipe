@@ -5,7 +5,7 @@ use futures::StreamExt;
 use log::{debug, error};
 use parking_lot::Mutex;
 use reqwest::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
     process::Command,
     sync::Arc,
@@ -36,18 +36,16 @@ impl TryFrom<FeedEntry> for MediaEntry {
     }
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
-pub struct MediaFile {
-    #[serde(rename = "webpage_url")]
+#[derive(sqlx::FromRow, Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Media {
+    #[serde(alias = "webpage_url")]
     pub source: String,
     pub id: String,
-    #[serde(rename = "filename")]
+    #[serde(alias = "filename")]
     pub path: String,
-    #[serde(rename = "fulltitle")]
+    #[serde(alias = "fulltitle")]
     pub title: String,
     pub description: String,
-    // pub channel: String,
-    // pub thumbnail: String,
 }
 
 pub async fn crawl_sources(sources: Sources) -> Vec<MediaEntry> {
@@ -88,8 +86,8 @@ async fn get_feed_downloads(client: Client, url: &str) -> Result<Vec<MediaEntry>
     Ok(items)
 }
 
-pub fn download_video(dir: String, url: String) -> JoinHandle<Result<MediaFile, String>> {
-    thread::spawn(move || -> Result<MediaFile, String> {
+pub fn download_video(dir: String, url: String) -> JoinHandle<Result<Media, String>> {
+    thread::spawn(move || -> Result<Media, String> {
         let output = Command::new("yt-dlp")
             .args([
                 "-f",
@@ -109,7 +107,7 @@ pub fn download_video(dir: String, url: String) -> JoinHandle<Result<MediaFile, 
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         if output.status.success() {
-            let info = serde_json::from_str::<MediaFile>(&stdout).map_err(|e| {
+            let info = serde_json::from_str::<Media>(&stdout).map_err(|e| {
                 format!(
                     "Failed to parse JSON: {e}\nSource: {stdout}\n^^^ End failed to parse JSON."
                 )

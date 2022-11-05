@@ -3,6 +3,7 @@ mod daemon;
 mod db;
 mod dl;
 mod error;
+mod gui;
 
 use owo_colors::OwoColorize;
 
@@ -11,7 +12,7 @@ async fn main() {
     env_logger::builder()
         .filter_level(log::LevelFilter::Info)
         .init();
-    let d = match daemon::Daemon::start() {
+    let d = match daemon::Daemon::start().await {
         Ok(d) => d,
         Err(e) => {
             eprintln!("{}: {}", "Failed to start daemon".red(), e);
