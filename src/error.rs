@@ -1,3 +1,9 @@
+use axum::{
+    body::boxed,
+    response::{IntoResponse, Response},
+};
+use log::error;
+use reqwest::StatusCode;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -16,4 +22,15 @@ pub enum Error {
     Sqlite(#[from] sqlx::Error),
     #[error("{0}")]
     Custom(String),
+}
+
+impl IntoResponse for Error {
+    fn into_response(self) -> Response {
+        let err = self.to_string();
+        error!("{err}");
+        Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body(boxed(err))
+            .unwrap()
+    }
 }

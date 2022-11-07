@@ -1,25 +1,28 @@
+use crate::{config::Source, daemon::State, db::Database, dl::Media, error::Error};
 use axum::{
     body::{boxed, Full},
     http::{header, StatusCode, Uri},
     response::Response,
-    routing::get,
+    routing::{get, post},
     Extension, Json, Router,
 };
-use log::{error, info};
+use log::info;
+use parking_lot::Mutex;
 use rust_embed::RustEmbed;
-use serde_json::{json, Value};
 use std::{net::SocketAddr, sync::Arc};
 
-use crate::db::Database;
-
-pub fn start(port: u16, db: Arc<Database>) {
+pub fn start(port: u16, db: Arc<Database>, state: Arc<Mutex<State>>) {
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     info!("Starting web interface on: http://{addr}");
 
     let app = Router::new()
         .route("/library", get(library))
+        .route("/sources", post(set_sources))
+        .route("/sources", get(get_sources))
         .fallback(handler)
-        .layer(Extension(db));
+        .layer(Extension(db))
+        .layer(Extension(state));
+
     tokio::spawn(async move {
         axum::Server::bind(&addr)
             .serve(app.into_make_service())
@@ -54,9 +57,17 @@ async fn handler(uri: Uri) -> Response {
     }
 }
 
-async fn library(Extension(db): Extension<Arc<Database>>) -> Result<Json<Value>, StatusCode> {
-    db.get_all().await.map(|a| Json(json!(a))).map_err(|e| {
-        error!("Failed database query: {e}");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })
+async fn set_sources(
+    Extension(state): Extension<Arc<Mutex<State>>>,
+    Json(sources): Json<Vec<Source>>,
+) -> Result<StatusCode, Error> {
+    state.lock().sources.set(sources).map(|_| StatusCode::OK)
+}
+
+async fn get_sources(Extension(state): Extension<Arc<Mutex<State>>>) -> Json<Vec<Source>> {
+    Json(state.lock().sources.get().clone())
+}
+
+async fn library(Extension(db): Extension<Arc<Database>>) -> Result<Json<Vec<Media>>, Error> {
+    db.get_all().await.map(|l| Json(l))
 }

@@ -1,4 +1,4 @@
-use crate::{config::Sources, error::Error};
+use crate::{config::Source, error::Error};
 use chrono::prelude::*;
 use feed_rs::{model::Entry as FeedEntry, parser};
 use futures::StreamExt;
@@ -43,33 +43,28 @@ pub struct Media {
     pub id: String,
     #[serde(alias = "filename")]
     pub path: String,
-    #[serde(alias = "fulltitle")]
     pub title: String,
     pub description: String,
 }
 
-pub async fn crawl_sources(sources: Sources) -> Vec<MediaEntry> {
+pub async fn crawl_sources(sources: Vec<Source>) -> Vec<MediaEntry> {
     let client = Client::new();
     let items = Arc::new(Mutex::new(Vec::new()));
-    tokio_stream::iter(&sources.sources)
+    tokio_stream::iter(&sources)
         .for_each_concurrent(128, |source| {
             let client = client.clone();
             let items = items.clone();
             async move {
-                match get_feed_downloads(client, source).await {
+                match get_feed_downloads(client, &source.url).await {
                     Ok(m) => items.lock().extend(m),
-                    Err(e) => error!("Error: {e}"),
+                    Err(e) => error!("Failed to get downloads for '{}': {e}", source.url),
                 }
             }
         })
         .await;
 
     let items = items.lock().to_vec();
-    debug!(
-        "Got {} entries from {} sources",
-        items.len(),
-        sources.sources.len()
-    );
+    debug!("Got {} entries from {} sources", items.len(), sources.len());
     items
 }
 
@@ -87,6 +82,7 @@ async fn get_feed_downloads(client: Client, url: &str) -> Result<Vec<MediaEntry>
 }
 
 pub fn download_video(dir: String, url: String) -> JoinHandle<Result<Media, String>> {
+    // TODO: Different downloaders
     thread::spawn(move || -> Result<Media, String> {
         let output = Command::new("yt-dlp")
             .args([
@@ -107,11 +103,8 @@ pub fn download_video(dir: String, url: String) -> JoinHandle<Result<Media, Stri
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         if output.status.success() {
-            let info = serde_json::from_str::<Media>(&stdout).map_err(|e| {
-                format!(
-                    "Failed to parse JSON: {e}\nSource: {stdout}\n^^^ End failed to parse JSON."
-                )
-            })?;
+            let info = serde_json::from_str::<Media>(&stdout)
+                .map_err(|e| format!("Failed to parse JSON: {e}"))?;
             Ok(info)
         } else {
             Err(format!("YT-DLP failed:\n{stderr}\n{stdout}",))

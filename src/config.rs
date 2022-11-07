@@ -1,11 +1,7 @@
-use crate::{dl::MediaEntry, error::Error};
+use crate::{dl::MediaEntry, error::Error, file};
 use chrono::{prelude::*, Duration};
-use log::info;
 use serde::{Deserialize, Serialize};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
@@ -32,7 +28,7 @@ impl Default for Config {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DownloadFilter {
-    #[serde(with = "dhms_duration_option")]
+    #[serde(with = "file::dhms_duration_option")]
     pub max_age: Option<Duration>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub before: Option<DateTime<Utc>>,
@@ -73,115 +69,45 @@ impl Default for DownloadFilter {
     }
 }
 
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SourceType {
+    Video,
+    Audio,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Source {
+    pub url: String,
+    pub r#type: SourceType,
+}
+
 pub struct Sources {
-    pub sources: Vec<String>,
+    path: PathBuf,
+    sources: Vec<Source>,
 }
 
-pub trait Loadable<T: Sized> {
-    fn load(path: &Path) -> Result<T, Error>;
-    fn reload(path: &Path) -> Result<T, Error>;
-}
-
-impl<T> Loadable<T> for T
-where
-    T: Default + for<'a> Deserialize<'a> + Serialize,
-{
-    fn load(path: &Path) -> Result<T, Error> {
-        if path.exists() {
-            info!("Loading config {path:?}");
-            let config_str = fs::read_to_string(path)?;
-            Ok(serde_yaml::from_str(&config_str)?)
-        } else {
-            let config = T::default();
-            info!("Default file generated at {path:?}");
-            let config_str = serde_yaml::to_string(&config)?;
-            fs::write(path, config_str)?;
-            Ok(config)
-        }
+impl Sources {
+    pub fn load(path: &Path) -> Result<Self, Error> {
+        let sources = file::load_or_create::<Vec<Source>>(&path)?;
+        Ok(Self {
+            path: path.to_path_buf(),
+            sources,
+        })
     }
 
-    fn reload(path: &Path) -> Result<T, Error> {
-        info!("Reloading {path:?}");
-        let config_str = fs::read_to_string(path)?;
-        Ok(serde_yaml::from_str::<T>(&config_str)?)
-    }
-}
-
-mod dhms_duration {
-    use chrono::Duration;
-    use serde::{de::Error, Deserialize, Deserializer, Serializer};
-    use std::num::ParseIntError;
-
-    pub fn serialize<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        fn format(n: i64, c: &str) -> String {
-            if n > 0 {
-                n.to_string() + c
-            } else {
-                String::new()
-            }
-        }
-        serializer.serialize_str(
-            &[
-                format(duration.num_days(), "d"),
-                format(duration.num_hours() % 24, "h"),
-                format(duration.num_minutes() % 60, "m"),
-                format(duration.num_seconds() % 60, "s"),
-            ]
-            .concat(),
-        )
+    pub fn reload(&mut self, path: &Path) -> Result<(), Error> {
+        self.sources = file::load::<Vec<Source>>(&path)?;
+        Ok(())
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let str = String::deserialize(deserializer)?;
-        fn parse(c: char, s: &str, p: &mut usize) -> Result<i64, ParseIntError> {
-            if let Some(i) = s.find(c) {
-                let r = s[*p..i].parse();
-                *p = i + 1;
-                r
-            } else {
-                Ok(0)
-            }
-        }
-        let mut p = 0;
-        let d = parse('d', &str, &mut p).map_err(Error::custom)?;
-        let h = parse('h', &str, &mut p).map_err(Error::custom)?;
-        let m = parse('m', &str, &mut p).map_err(Error::custom)?;
-        let s = parse('s', &str, &mut p).map_err(Error::custom)?;
-        Ok(Duration::seconds(
-            d * 24 * 60 * 60 + h * 60 * 60 + m * 60 + s,
-        ))
-    }
-}
-
-mod dhms_duration_option {
-    use super::dhms_duration;
-    use chrono::Duration;
-    use serde::{de::Error, Deserializer, Serializer};
-
-    pub fn serialize<S>(duration: &Option<Duration>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match duration {
-            Some(dur) => dhms_duration::serialize(dur, serializer),
-            None => serializer.serialize_none(),
-        }
+    pub fn get(&self) -> Vec<Source> {
+        self.sources.clone()
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Duration>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        match dhms_duration::deserialize(deserializer) {
-            Ok(dur) => Ok(Some(dur)),
-            Err(err) => Err(Error::custom(err)),
-        }
+    pub fn set(&mut self, sources: Vec<Source>) -> Result<(), Error> {
+        self.sources = sources;
+        file::save(&self.sources, &self.path)?;
+        Ok(())
     }
 }

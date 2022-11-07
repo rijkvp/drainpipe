@@ -3,6 +3,7 @@ mod daemon;
 mod db;
 mod dl;
 mod error;
+mod file;
 mod gui;
 
 use owo_colors::OwoColorize;
