@@ -12,7 +12,7 @@ use rust_embed::RustEmbed;
 use std::{net::SocketAddr, sync::Arc};
 
 pub fn start(port: u16, db: Arc<Database>, state: Arc<Mutex<State>>) {
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
     info!("Starting web interface on: http://{addr}");
 
     let app = Router::new()

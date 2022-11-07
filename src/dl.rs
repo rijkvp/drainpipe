@@ -48,6 +48,7 @@ pub struct Media {
 }
 
 pub async fn crawl_sources(sources: Vec<Source>) -> Vec<MediaEntry> {
+    debug!("Crawling feeds from {} sources..", sources.len());
     let client = Client::new();
     let items = Arc::new(Mutex::new(Vec::new()));
     tokio_stream::iter(&sources)

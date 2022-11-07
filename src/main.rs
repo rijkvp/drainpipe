@@ -11,7 +11,7 @@ use owo_colors::OwoColorize;
 #[tokio::main]
 async fn main() {
     env_logger::builder()
-        .filter_level(log::LevelFilter::Info)
+        .filter_level(log::LevelFilter::Debug)
         .init();
     let d = match daemon::Daemon::start().await {
         Ok(d) => d,

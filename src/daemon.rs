@@ -46,7 +46,9 @@ impl Daemon {
         fs::create_dir_all(&config_dir)?;
 
         let config_path = config_dir.join("config.yaml");
+        info!("Loading config from {config_path:?}");
         let sources_path = config_dir.join("sources.yaml");
+        info!("Loading sources from {config_path:?}");
         let config = file::load_or_create(&config_path)?;
         let sources = Sources::load(&sources_path)?;
         let state = State {
@@ -133,6 +135,7 @@ impl Daemon {
                     let task = self.sync_task.take().unwrap();
                     match task.await {
                         Ok(mut entries) => {
+                            info!("Got {} entries from sync", entries.len());
                             // Apply download filter
                             if let Some(filter) = &state.config.download_filter {
                                 entries.retain(|e| !filter.filter(e));

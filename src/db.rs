@@ -9,7 +9,7 @@ pub struct Database {
 
 impl Database {
     pub async fn load(path: &Path) -> Result<Self, Error> {
-        let pool = SqlitePool::connect_with(SqliteConnectOptions::new().filename(path)).await?;
+        let pool = SqlitePool::connect_with(SqliteConnectOptions::new().create_if_missing(true).filename(path)).await?;
 
         let mut conn = pool.acquire().await?;
         sqlx::query(
