@@ -18,7 +18,7 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     - name: Cache
-      uses: actions/cache@v1
+      uses: actions/cache@v3
       with: 
         path: ${{ github.workspace }}/cache
         key: docker-${{ runner.os }}-${{ hashfiles('cache/**') }}
@@ -30,5 +30,4 @@ jobs:
         --cache-from "type=local,src=$GITHUB_WORKSPACE/cache"
         --cache-to "type=local,dest=$GITHUB_WORKSPACE/cache"
         --tag ghcr.io/rijkvp/drainpipe:dev
-    - name: Push the Docker image
-      run: docker push ghcr.io/rijkvp/drainpipe:dev
+        --push
