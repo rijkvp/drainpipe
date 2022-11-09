@@ -6,7 +6,7 @@ use axum::{
     routing::{get, post},
     Extension, Json, Router,
 };
-use log::info;
+use tracing::info;
 use parking_lot::Mutex;
 use rust_embed::RustEmbed;
 use std::{net::SocketAddr, sync::Arc};

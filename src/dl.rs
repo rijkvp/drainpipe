@@ -2,7 +2,7 @@ use crate::{config::Source, error::Error};
 use chrono::prelude::*;
 use feed_rs::{model::Entry as FeedEntry, parser};
 use futures::StreamExt;
-use log::{debug, error};
+use tracing::{debug, error};
 use parking_lot::Mutex;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};

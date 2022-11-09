@@ -7,20 +7,24 @@ mod file;
 mod gui;
 
 use owo_colors::OwoColorize;
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]
 async fn main() {
-    env_logger::builder()
-        .filter_level(log::LevelFilter::Debug)
-        .init();
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(Level::INFO)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+
     let d = match daemon::Daemon::start().await {
         Ok(d) => d,
         Err(e) => {
-            eprintln!("{}: {}", "Failed to start daemon".red(), e);
+            eprintln!("{}: {}", "Failed to start daemon".red().bold(), e);
             return;
         }
     };
     if let Err(e) = d.run().await {
-        eprintln!("{}: {}", "Daemon error".red(), e);
+        eprintln!("{}: {}", "Daemon error".red().bold(), e);
     }
 }

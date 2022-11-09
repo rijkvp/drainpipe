@@ -1,12 +1,12 @@
 use crate::{
-    config::{Config, Source, Sources},
+    config::{Source, Sources, Config},
     db::Database,
     dl::{self, Media, MediaEntry},
     error::Error,
-    file, gui,
+    gui,
 };
 use crossbeam_channel::{unbounded, Receiver};
-use log::{error, info};
+use tracing::{error, info};
 use notify::{Event, INotifyWatcher, RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
 use std::{
@@ -49,7 +49,7 @@ impl Daemon {
         info!("Loading config from {config_path:?}");
         let sources_path = config_dir.join("sources.yaml");
         info!("Loading sources from {config_path:?}");
-        let config = file::load_or_create(&config_path)?;
+        let config = Config::load(&config_path)?;
         let sources = Sources::load(&sources_path)?;
         let state = State {
             config,
@@ -62,13 +62,13 @@ impl Daemon {
         watcher.watch(&config_path, RecursiveMode::NonRecursive)?;
         watcher.watch(&sources_path, RecursiveMode::NonRecursive)?;
 
-        fs::create_dir_all(&state.config.media_dir)?;
+        fs::create_dir_all(&state.config.data.media_dir)?;
 
         let data_dir = dirs::data_dir().unwrap().join(DIR_NAME);
         fs::create_dir_all(&data_dir)?;
         let db = Database::load(&data_dir.join("library.db")).await?;
 
-        let port = state.config.port;
+        let port = state.config.data.port;
         let state = Arc::new(Mutex::new(state));
         gui::start(port, Arc::new(db.clone()), state.clone());
 
@@ -103,7 +103,6 @@ impl Daemon {
                 match thread.join().unwrap() {
                     Ok(media) => {
                         info!("Downloaded '{}' to '{}'", media.title, media.path);
-                        // TODO: Block
                         self.db.insert(&media).await?;
                     }
                     Err(e) => error!("Download failed: {e}"),
@@ -115,12 +114,9 @@ impl Daemon {
                 let event = event?;
                 if !event.kind.is_access() {
                     if event.paths.contains(&self.config_path) {
-                        match file::load(&self.config_path) {
-                            Ok(new) => state.config = new,
-                            Err(e) => error!("Failed to reload config: {e}"),
-                        }
+                        state.config.reload()?;
                     } else if event.paths.contains(&self.sources_path) {
-                        state.sources.reload(&self.sources_path)?;
+                        state.sources.reload()?;
                         // Sync on sources update
                         if self.last_sync.is_none() {
                             self.start_sync(state.sources.get());
@@ -137,7 +133,7 @@ impl Daemon {
                         Ok(mut entries) => {
                             info!("Got {} entries from sync", entries.len());
                             // Apply download filter
-                            if let Some(filter) = &state.config.download_filter {
+                            if let Some(filter) = &state.config.data.download_filter {
                                 entries.retain(|e| !filter.filter(e));
                             }
                             // Check if not alreaday downloaded
@@ -154,7 +150,7 @@ impl Daemon {
                 }
             } else if self
                 .last_sync
-                .map(|v| v.elapsed().as_secs() > state.config.sync_interval)
+                .map(|v| v.elapsed().as_secs() > state.config.data.sync_interval)
                 .unwrap_or(true)
             {
                 self.start_sync(state.sources.get());
@@ -163,6 +159,7 @@ impl Daemon {
             // Start downloads
             for _ in 0..state
                 .config
+                .data
                 .parallel_downloads
                 .saturating_sub(self.dl_tasks.len() as u64)
             {
@@ -173,7 +170,7 @@ impl Daemon {
                         item.link
                     );
                     self.dl_tasks.push(dl::download_video(
-                        state.config.media_dir.to_string_lossy().to_string(),
+                        state.config.data.media_dir.to_string_lossy().to_string(),
                         item.link,
                     ));
                 }

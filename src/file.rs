@@ -1,5 +1,5 @@
 use crate::error::Error;
-use log::debug;
+use tracing::debug;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
 

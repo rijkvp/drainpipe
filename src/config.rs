@@ -1,20 +1,25 @@
-use crate::{dl::MediaEntry, error::Error, file};
+use crate::{dl::MediaEntry, error::Error};
 use chrono::{prelude::*, Duration};
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::{
+    net::{IpAddr, Ipv4Addr},
+    path::{Path, PathBuf},
+};
+use tracing::info;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
-pub struct Config {
+pub struct ConfigData {
     pub sync_interval: u64,
     pub parallel_downloads: u64,
     pub media_dir: PathBuf,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub download_filter: Option<DownloadFilter>,
     pub port: u16,
+    pub address: IpAddr,
 }
 
-impl Default for Config {
+impl Default for ConfigData {
     fn default() -> Self {
         Self {
             sync_interval: 900,
@@ -22,13 +27,45 @@ impl Default for Config {
             media_dir: dirs::home_dir().unwrap().join("media"),
             download_filter: None,
             port: 9193,
+            address: Ipv4Addr::UNSPECIFIED.into(),
         }
+    }
+}
+
+pub struct Config {
+    path: PathBuf,
+    from_env: bool,
+    pub data: ConfigData,
+}
+
+impl Config {
+    pub fn load(path: &Path) -> Result<Self, Error> {
+        let (data, from_env) = if path.exists() {
+            info!("Loading config from file path");
+            (crate::file::load(path)?, false)
+        } else {
+            info!("Loading config from env");
+            (envy::prefixed("DRAINPIPE_").from_env::<ConfigData>()?, true)
+        };
+
+        Ok(Self {
+            path: path.to_path_buf(),
+            from_env,
+            data,
+        })
+    }
+
+    pub fn reload(&mut self) -> Result<(), Error> {
+        if !self.from_env {
+            self.data = crate::file::load(&self.path)?;
+        }
+        Ok(())
     }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DownloadFilter {
-    #[serde(with = "file::dhms_duration_option")]
+    #[serde(with = "crate::file::dhms_duration_option")]
     pub max_age: Option<Duration>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub before: Option<DateTime<Utc>>,
@@ -89,15 +126,15 @@ pub struct Sources {
 
 impl Sources {
     pub fn load(path: &Path) -> Result<Self, Error> {
-        let sources = file::load_or_create::<Vec<Source>>(&path)?;
+        let sources = crate::file::load_or_create::<Vec<Source>>(&path)?;
         Ok(Self {
             path: path.to_path_buf(),
             sources,
         })
     }
 
-    pub fn reload(&mut self, path: &Path) -> Result<(), Error> {
-        self.sources = file::load::<Vec<Source>>(&path)?;
+    pub fn reload(&mut self) -> Result<(), Error> {
+        self.sources = crate::file::load::<Vec<Source>>(&self.path)?;
         Ok(())
     }
 
@@ -107,7 +144,7 @@ impl Sources {
 
     pub fn set(&mut self, sources: Vec<Source>) -> Result<(), Error> {
         self.sources = sources;
-        file::save(&self.sources, &self.path)?;
+        crate::file::save(&self.sources, &self.path)?;
         Ok(())
     }
 }

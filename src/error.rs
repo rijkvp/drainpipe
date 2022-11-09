@@ -1,9 +1,3 @@
-use axum::{
-    body::boxed,
-    response::{IntoResponse, Response},
-};
-use log::error;
-use reqwest::StatusCode;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -14,6 +8,8 @@ pub enum Error {
     FileWatch(#[from] notify::Error),
     #[error("YAML deserialization error: {0}")]
     Yaml(#[from] serde_yaml::Error),
+    #[error("Env deserialization error: {0}")]
+    Env(#[from] envy::Error),
     #[error("HTTP error: {0}")]
     Http(#[from] reqwest::Error),
     #[error("Feed parse error: {0}")]
@@ -23,6 +19,12 @@ pub enum Error {
     #[error("{0}")]
     Custom(String),
 }
+
+use axum::{
+    body::boxed,
+    response::{IntoResponse, Response}, http::StatusCode,
+};
+use tracing::error;
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
