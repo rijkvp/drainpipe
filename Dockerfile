@@ -9,5 +9,5 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 
 FROM alpine
 COPY --from=builder /app/drainpipe /drainpipe 
-RUN apk update && apk --no-cache --update add yt-dlp
+RUN apk update && apk --no-cache --update add yt-dlp ffmpeg
 ENTRYPOINT [ "/drainpipe" ]
