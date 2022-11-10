@@ -34,7 +34,7 @@ impl Default for ConfigData {
 
 pub struct Config {
     path: PathBuf,
-    from_env: bool,
+    pub from_env: bool,
     pub data: ConfigData,
 }
 
@@ -44,7 +44,7 @@ impl Config {
             info!("Loading config from file path");
             (crate::file::load(path)?, false)
         } else {
-            info!("Loading config from env");
+            info!("Loading config from environment");
             (envy::prefixed("DRAINPIPE_").from_env::<ConfigData>()?, true)
         };
 
@@ -126,6 +126,7 @@ pub struct Sources {
 
 impl Sources {
     pub fn load(path: &Path) -> Result<Self, Error> {
+        info!("Loading sources from {path:?}");
         let sources = crate::file::load_or_create::<Vec<Source>>(&path)?;
         Ok(Self {
             path: path.to_path_buf(),

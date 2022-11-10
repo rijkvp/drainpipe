@@ -46,9 +46,7 @@ impl Daemon {
         fs::create_dir_all(&config_dir)?;
 
         let config_path = config_dir.join("config.yaml");
-        info!("Loading config from {config_path:?}");
         let sources_path = config_dir.join("sources.yaml");
-        info!("Loading sources from {config_path:?}");
         let config = Config::load(&config_path)?;
         let sources = Sources::load(&sources_path)?;
         let state = State {
@@ -59,7 +57,9 @@ impl Daemon {
 
         let (event_tx, event_rx) = unbounded();
         let mut watcher = RecommendedWatcher::new(event_tx, notify::Config::default())?;
-        watcher.watch(&config_path, RecursiveMode::NonRecursive)?;
+        if !state.config.from_env {
+            watcher.watch(&config_path, RecursiveMode::NonRecursive)?;
+        }
         watcher.watch(&sources_path, RecursiveMode::NonRecursive)?;
 
         fs::create_dir_all(&state.config.data.media_dir)?;
