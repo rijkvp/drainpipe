@@ -1,14 +1,12 @@
 use crate::{
-    config::{Source, Sources, Config},
+    config::{Config, Source, Sources},
     db::Database,
     dl::{self, Media, MediaEntry},
     error::Error,
     gui,
 };
 use crossbeam_channel::{unbounded, Receiver};
-use tracing::{error, info};
 use notify::{Event, INotifyWatcher, RecommendedWatcher, RecursiveMode, Watcher};
-use parking_lot::Mutex;
 use std::{
     collections::VecDeque,
     fs,
@@ -17,7 +15,8 @@ use std::{
     thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
-use tokio::task::JoinHandle as Task;
+use tokio::{sync::Mutex, task::JoinHandle as Task};
+use tracing::{error, info};
 
 const UPDATE_INTERVAL: u64 = 500;
 const DIR_NAME: &str = "drainpipe";
@@ -26,6 +25,7 @@ pub struct State {
     pub config: Config,
     pub sources: Sources,
     pub dl_queue: VecDeque<MediaEntry>,
+    pub dl_tasks: Vec<(MediaEntry, JoinHandle<Result<Media, String>>)>,
 }
 
 pub struct Daemon {
@@ -33,7 +33,6 @@ pub struct Daemon {
     sources_path: PathBuf,
     fs_event_rx: Receiver<Result<Event, notify::Error>>,
     _watcher: INotifyWatcher,
-    dl_tasks: Vec<JoinHandle<Result<Media, String>>>,
     sync_task: Option<Task<Vec<MediaEntry>>>,
     last_sync: Option<Instant>,
     state: Arc<Mutex<State>>,
@@ -53,6 +52,7 @@ impl Daemon {
             config,
             sources,
             dl_queue: VecDeque::new(),
+            dl_tasks: Vec::new(),
         };
 
         let (event_tx, event_rx) = unbounded();
@@ -77,7 +77,6 @@ impl Daemon {
             sources_path,
             fs_event_rx: event_rx,
             _watcher: watcher,
-            dl_tasks: Vec::new(),
             last_sync: None,
             sync_task: None,
             state,
@@ -89,17 +88,17 @@ impl Daemon {
         info!("Daemon started.");
         loop {
             let state = self.state.clone();
-            let mut state = state.lock();
+            let mut state = state.lock().await;
 
             // Receive finished threads
-            let mut finished = Vec::with_capacity(self.dl_tasks.len());
-            for (n, thread) in self.dl_tasks.iter().enumerate() {
+            let mut finished = Vec::with_capacity(state.dl_tasks.len());
+            for (n, (_, thread)) in state.dl_tasks.iter().enumerate() {
                 if thread.is_finished() {
                     finished.push(n);
                 }
             }
             for n in finished.into_iter() {
-                let thread = self.dl_tasks.remove(n);
+                let (_, thread) = state.dl_tasks.remove(n);
                 match thread.join().unwrap() {
                     Ok(media) => {
                         info!("Downloaded '{}' to '{}'", media.title, media.path);
@@ -117,10 +116,6 @@ impl Daemon {
                         state.config.reload()?;
                     } else if event.paths.contains(&self.sources_path) {
                         state.sources.reload()?;
-                        // Sync on sources update
-                        if self.last_sync.is_none() {
-                            self.start_sync(state.sources.get());
-                        }
                     }
                 }
             }
@@ -136,11 +131,17 @@ impl Daemon {
                             if let Some(filter) = &state.config.data.download_filter {
                                 entries.retain(|e| !filter.filter(e));
                             }
+                            info!("Filtered {}", entries.len());
                             // Check if not alreaday downloaded
                             for e in entries {
                                 // TODO: Prevent blocking here
-                                if self.db.get(&e.link).await?.is_none() {
-                                    info!("Add '{}' to queue", e.link);
+                                // Check if not already in queue, not already being downloaded and
+                                // not already downloaded
+                                if !state.dl_queue.contains(&e)
+                                    && !state.dl_tasks.iter().any(|(e2, _)| e2.link == e.link)
+                                    && self.db.get(&e.link).await?.is_none()
+                                {
+                                    info!("Added '{}' to download queue", e.link);
                                     state.dl_queue.push_back(e);
                                 }
                             }
@@ -152,7 +153,9 @@ impl Daemon {
                 .last_sync
                 .map(|v| v.elapsed().as_secs() > state.config.data.sync_interval)
                 .unwrap_or(true)
+                || state.sources.changed()
             {
+                info!("Sarting sync..");
                 self.start_sync(state.sources.get());
             }
 
@@ -161,18 +164,14 @@ impl Daemon {
                 .config
                 .data
                 .parallel_downloads
-                .saturating_sub(self.dl_tasks.len() as u64)
+                .saturating_sub(state.dl_tasks.len() as u64)
             {
-                if let Some(item) = state.dl_queue.pop_front() {
-                    info!(
-                        "Downloading {}  {}",
-                        item.title.unwrap_or_else(|| "Unkown Title".to_string()),
-                        item.link
-                    );
-                    self.dl_tasks.push(dl::download_video(
-                        state.config.data.media_dir.to_string_lossy().to_string(),
-                        item.link,
-                    ));
+                if let Some(entry) = state.dl_queue.pop_front() {
+                    info!("Start download of {:?}  {}", &entry.title, &entry.link);
+                    let dir = state.config.data.media_dir.to_string_lossy().to_string();
+                    state
+                        .dl_tasks
+                        .push((entry.clone(), dl::download_video(dir, entry.link)));
                 }
             }
             thread::sleep(Duration::from_millis(UPDATE_INTERVAL));
@@ -180,7 +179,6 @@ impl Daemon {
     }
 
     fn start_sync(&mut self, sources: Vec<Source>) {
-        info!("Sarting sync..");
         self.sync_task = Some(tokio::spawn(dl::crawl_sources(sources)));
         self.last_sync = Some(Instant::now());
     }

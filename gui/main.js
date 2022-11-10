@@ -1,3 +1,5 @@
+const tasksContainer = document.getElementById('tasks');
+const queueContainer = document.getElementById('queue');
 const sourcesContainer = document.getElementById('sources');
 const libraryContainer = document.getElementById('library');
 
@@ -57,17 +59,42 @@ function addSource() {
   displaySources();
 }
 
-sourceAddButton.addEventListener('click', () => addSource());
-
-getSources();
-
-fetch('/library')
-  .then((response) => response.json())
-  .then((library) => {
-    libraryContainer.innerHTML = '';
-    library.forEach((e) => {
-      const item = document.createElement('li');
-      item.innerHTML = `${e.title}`;
-      libraryContainer.appendChild(item);
+function update() {
+  fetch('/tasks')
+    .then((response) => response.json())
+    .then((tasks) => {
+      tasksContainer.innerHTML = '';
+      tasks.forEach((e) => {
+        const item = document.createElement('li');
+        item.innerHTML = `${e.title} (${e.link})`;
+        tasksContainer.appendChild(item);
+      });
     });
-  });
+
+  fetch('/queue')
+    .then((response) => response.json())
+    .then((queue) => {
+      queueContainer.innerHTML = '';
+      queue.forEach((e) => {
+        const item = document.createElement('li');
+        item.innerHTML = `${e.title} (${e.link})`;
+        queueContainer.appendChild(item);
+      });
+    });
+
+  fetch('/library')
+    .then((response) => response.json())
+    .then((library) => {
+      libraryContainer.innerHTML = '';
+      library.forEach((e) => {
+        const item = document.createElement('li');
+        item.innerHTML = `${e.title}`;
+        libraryContainer.appendChild(item);
+      });
+    });
+}
+
+sourceAddButton.addEventListener('click', () => addSource());
+getSources();
+update();
+

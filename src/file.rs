@@ -1,7 +1,7 @@
 use crate::error::Error;
-use tracing::debug;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
+use tracing::debug;
 
 pub fn load_or_create<T>(path: &Path) -> Result<T, Error>
 where

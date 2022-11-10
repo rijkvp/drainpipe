@@ -1,4 +1,10 @@
-use crate::{config::Source, daemon::State, db::Database, dl::Media, error::Error};
+use crate::{
+    config::Source,
+    daemon::State,
+    db::Database,
+    dl::{Media, MediaEntry},
+    error::Error,
+};
 use axum::{
     body::{boxed, Full},
     http::{header, StatusCode, Uri},
@@ -6,10 +12,10 @@ use axum::{
     routing::{get, post},
     Extension, Json, Router,
 };
-use tracing::info;
-use parking_lot::Mutex;
 use rust_embed::RustEmbed;
 use std::{net::SocketAddr, sync::Arc};
+use tokio::sync::Mutex;
+use tracing::info;
 
 pub fn start(port: u16, db: Arc<Database>, state: Arc<Mutex<State>>) {
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
@@ -19,6 +25,8 @@ pub fn start(port: u16, db: Arc<Database>, state: Arc<Mutex<State>>) {
         .route("/library", get(library))
         .route("/sources", post(set_sources))
         .route("/sources", get(get_sources))
+        .route("/tasks", get(get_tasks))
+        .route("/queue", get(get_queue))
         .fallback(handler)
         .layer(Extension(db))
         .layer(Extension(state));
@@ -40,7 +48,7 @@ async fn handler(uri: Uri) -> Response {
     if path.is_empty() {
         path = "index.html";
     }
-    match StaticFile::get(&path) {
+    match StaticFile::get(path) {
         Some(content) => {
             let body = boxed(Full::from(content.data));
             let mime = mime_guess::from_path(path).first_or_octet_stream();
@@ -57,17 +65,36 @@ async fn handler(uri: Uri) -> Response {
     }
 }
 
+async fn get_tasks(Extension(state): Extension<Arc<Mutex<State>>>) -> Json<Vec<MediaEntry>> {
+    Json(
+        (&state.lock().await.dl_tasks)
+            .iter()
+            .map(|(l, _)| l.clone())
+            .collect(),
+    )
+}
+
+async fn get_queue(Extension(state): Extension<Arc<Mutex<State>>>) -> Json<Vec<MediaEntry>> {
+    let queue = state.lock().await.dl_queue.clone();
+    Json(Vec::from_iter(queue.into_iter()))
+}
+
 async fn set_sources(
     Extension(state): Extension<Arc<Mutex<State>>>,
     Json(sources): Json<Vec<Source>>,
 ) -> Result<StatusCode, Error> {
-    state.lock().sources.set(sources).map(|_| StatusCode::OK)
+    state
+        .lock()
+        .await
+        .sources
+        .set(sources)
+        .map(|_| StatusCode::OK)
 }
 
 async fn get_sources(Extension(state): Extension<Arc<Mutex<State>>>) -> Json<Vec<Source>> {
-    Json(state.lock().sources.get().clone())
+    Json(state.lock().await.sources.get())
 }
 
 async fn library(Extension(db): Extension<Arc<Database>>) -> Result<Json<Vec<Media>>, Error> {
-    db.get_all().await.map(|l| Json(l))
+    db.get_all().await.map(Json)
 }

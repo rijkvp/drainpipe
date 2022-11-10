@@ -22,7 +22,8 @@ pub enum Error {
 
 use axum::{
     body::boxed,
-    response::{IntoResponse, Response}, http::StatusCode,
+    http::StatusCode,
+    response::{IntoResponse, Response},
 };
 use tracing::error;
 

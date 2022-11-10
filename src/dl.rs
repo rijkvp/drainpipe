@@ -2,7 +2,6 @@ use crate::{config::Source, error::Error};
 use chrono::prelude::*;
 use feed_rs::{model::Entry as FeedEntry, parser};
 use futures::StreamExt;
-use tracing::{debug, error};
 use parking_lot::Mutex;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -11,12 +10,19 @@ use std::{
     sync::Arc,
     thread::{self, JoinHandle},
 };
+use tracing::{debug, error};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct MediaEntry {
     pub title: Option<String>,
     pub link: String,
     pub published: Option<DateTime<Utc>>,
+}
+
+impl PartialEq for MediaEntry {
+    fn eq(&self, other: &Self) -> bool {
+        self.link == other.link
+    }
 }
 
 impl TryFrom<FeedEntry> for MediaEntry {
