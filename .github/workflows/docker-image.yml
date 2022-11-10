@@ -17,17 +17,12 @@ jobs:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-    - name: Cache
-      uses: actions/cache@v3
-      with: 
-        path: ${{ github.workspace }}/cache
-        key: docker-${{ runner.os }}-${{ hashfiles('cache/**') }}
-        restore-keys: |
-          docker-${{ runner.os }}-
-    - name: Build Docker image
-      run: >
-        docker buildx build .
-        --cache-from "type=local,src=$GITHUB_WORKSPACE/cache"
-        --cache-to "type=local,dest=$GITHUB_WORKSPACE/cache"
-        --tag ghcr.io/rijkvp/drainpipe:dev
-        --push
+    - name: Build and push
+      uses: docker/build-push-action@v3
+      with:
+        context: .
+        push: true
+        tags: "ghcr.io/rijkvp/drainpipe:dev"
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
