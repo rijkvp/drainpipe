@@ -49,11 +49,31 @@ function removeSource(index) {
   displaySources();
 }
 
-function addSource() {
+async function getYoutubeFeed(url) {
+  let feed = await fetch('/yt_feed', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      url: url
+    }),
+  }).then((response) => response.text())
+  return feed;
+}
+
+
+async function getFeed(url) {
+  if (url.startsWith("www.youtube.com/c/") || url.startsWith("https://www.youtube.com/c/")) {
+    return await getYoutubeFeed(url);
+  }
+  return url;
+}
+
+async function addSource() {
   const url = sourceUrlInput.value;
+  const feedUrl = await getFeed(url);
   const type = sourceTypeInput.value;
   sourceUrlInput.value = '';
-  const source = { url: url, type: type };
+  const source = { url: feedUrl, type: type };
   sources.push(source)
   setSources();
   displaySources();

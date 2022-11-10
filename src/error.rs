@@ -12,6 +12,8 @@ pub enum Error {
     Env(#[from] envy::Error),
     #[error("HTTP error: {0}")]
     Http(#[from] reqwest::Error),
+    #[error("URL parse error: {0}")]
+    Url(#[from] url::ParseError),
     #[error("Feed parse error: {0}")]
     Feed(#[from] feed_rs::parser::ParseFeedError),
     #[error("Sqlite error: {0}")]

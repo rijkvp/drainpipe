@@ -1,5 +1,6 @@
 use crate::{dl::Media, error::Error};
 use sqlx::{sqlite::SqliteConnectOptions, FromRow, SqlitePool};
+use tracing::log::info;
 use std::path::Path;
 
 #[derive(Clone)]
@@ -9,6 +10,7 @@ pub struct Database {
 
 impl Database {
     pub async fn load(path: &Path) -> Result<Self, Error> {
+        info!("Loading database from {path:?}");
         let pool = SqlitePool::connect_with(
             SqliteConnectOptions::new()
                 .create_if_missing(true)

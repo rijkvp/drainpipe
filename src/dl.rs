@@ -2,7 +2,6 @@ use crate::{config::Source, error::Error};
 use chrono::prelude::*;
 use feed_rs::{model::Entry as FeedEntry, parser};
 use futures::StreamExt;
-use parking_lot::Mutex;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -10,6 +9,7 @@ use std::{
     sync::Arc,
     thread::{self, JoinHandle},
 };
+use tokio::sync::Mutex;
 use tracing::{debug, error};
 
 #[derive(Debug, Clone, Serialize)]
@@ -63,14 +63,14 @@ pub async fn crawl_sources(sources: Vec<Source>) -> Vec<MediaEntry> {
             let items = items.clone();
             async move {
                 match get_feed_downloads(client, &source.url).await {
-                    Ok(m) => items.lock().extend(m),
+                    Ok(m) => items.lock().await.extend(m),
                     Err(e) => error!("Failed to get downloads for '{}': {e}", source.url),
                 }
             }
         })
         .await;
 
-    let items = items.lock().to_vec();
+    let items = items.lock().await.to_vec();
     debug!("Got {} entries from {} sources", items.len(), sources.len());
     items
 }
