@@ -7,6 +7,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release --all-features --target x86_64-unknown-linux-musl \
    && cp target/x86_64-unknown-linux-musl/release/drainpipe .
 
-FROM scratch
+FROM alpine
 COPY --from=builder /app/drainpipe /drainpipe 
+RUN apk update && apk --no-cache --update add yt-dlp
 ENTRYPOINT [ "/drainpipe" ]
