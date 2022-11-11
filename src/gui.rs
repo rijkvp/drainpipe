@@ -1,5 +1,5 @@
 use crate::{
-    config::Source,
+    config::{ConfigData, Source},
     daemon::State,
     db::Database,
     dl::{Media, MediaEntry},
@@ -15,7 +15,7 @@ use axum::{
 use reqwest::Url;
 use rust_embed::RustEmbed;
 use scraper::{Html, Selector};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::Mutex;
 use tracing::info;
@@ -25,11 +25,11 @@ pub fn start(port: u16, db: Arc<Database>, state: Arc<Mutex<State>>) {
     info!("Starting web interface on: http://{addr}");
 
     let app = Router::new()
-        .route("/library", get(library))
         .route("/sources", post(set_sources))
         .route("/sources", get(get_sources))
-        .route("/tasks", get(get_tasks))
-        .route("/queue", get(get_queue))
+        .route("/state", get(get_state))
+        .route("/config", get(get_config))
+        .route("/config", post(set_config))
         .route("/yt_feed", post(yt_feed))
         .fallback(handler)
         .layer(Extension(db))
@@ -69,41 +69,49 @@ async fn handler(uri: Uri) -> Response {
     }
 }
 
-async fn get_tasks(Extension(state): Extension<Arc<Mutex<State>>>) -> Json<Vec<MediaEntry>> {
-    Json(
-        state
-            .lock()
-            .await
-            .dl_tasks
-            .iter()
-            .map(|(l, _)| l.clone())
-            .collect(),
-    )
+#[derive(Serialize)]
+struct StateResponse {
+    tasks: Vec<MediaEntry>,
+    queue: Vec<MediaEntry>,
+    library: Vec<Media>,
 }
 
-async fn get_queue(Extension(state): Extension<Arc<Mutex<State>>>) -> Json<Vec<MediaEntry>> {
-    let queue = state.lock().await.dl_queue.clone();
-    Json(Vec::from_iter(queue.into_iter()))
-}
-
-async fn set_sources(
+async fn get_state(
     Extension(state): Extension<Arc<Mutex<State>>>,
-    Json(sources): Json<Vec<Source>>,
-) -> Result<StatusCode, Error> {
-    state
-        .lock()
-        .await
-        .sources
-        .set(sources)
-        .map(|_| StatusCode::OK)
+    Extension(db): Extension<Arc<Database>>,
+) -> Result<Json<StateResponse>, Error> {
+    let state = state.lock().await;
+    let tasks = state.dl_tasks.iter().map(|(l, _)| l.clone()).collect();
+    let queue = Vec::from_iter(state.dl_queue.clone().into_iter());
+    let library = db.get_all().await?;
+
+    Ok(Json(StateResponse {
+        tasks,
+        queue,
+        library,
+    }))
 }
 
 async fn get_sources(Extension(state): Extension<Arc<Mutex<State>>>) -> Json<Vec<Source>> {
     Json(state.lock().await.sources.get())
 }
 
-async fn library(Extension(db): Extension<Arc<Database>>) -> Result<Json<Vec<Media>>, Error> {
-    db.get_all().await.map(Json)
+async fn set_sources(
+    Extension(state): Extension<Arc<Mutex<State>>>,
+    Json(sources): Json<Vec<Source>>,
+) -> Result<(), Error> {
+    state.lock().await.sources.set(sources)
+}
+
+async fn get_config(Extension(state): Extension<Arc<Mutex<State>>>) -> Json<ConfigData> {
+    Json(state.lock().await.config.data.clone())
+}
+
+async fn set_config(
+    Extension(state): Extension<Arc<Mutex<State>>>,
+    Json(config): Json<ConfigData>,
+) -> Result<(), Error> {
+    state.lock().await.config.set(config)
 }
 
 #[derive(Deserialize)]

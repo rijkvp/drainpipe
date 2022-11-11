@@ -7,7 +7,7 @@ use std::{
 };
 use tracing::info;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ConfigData {
     pub sync_interval: u64,
@@ -61,9 +61,15 @@ impl Config {
         }
         Ok(())
     }
+
+    pub fn set(&mut self, data: ConfigData) -> Result<(), Error> {
+        self.data = data;
+        crate::file::save(&self.data, &self.path)?;
+        Ok(())
+    }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DownloadFilter {
     #[serde(with = "crate::file::dhms_duration_option")]
     pub max_age: Option<Duration>,
