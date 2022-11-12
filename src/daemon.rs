@@ -1,9 +1,11 @@
 use crate::{
-    config::{Config, Source, Sources},
+    config::Config,
     db::Database,
-    dl::{self, Media, MediaEntry},
+    dl,
     error::Error,
     gui,
+    media::{Media, MediaEntry},
+    source::{Source, Sources},
 };
 use crossbeam_channel::{unbounded, Receiver};
 use notify::{Event, INotifyWatcher, RecommendedWatcher, RecursiveMode, Watcher};
@@ -97,7 +99,7 @@ impl Daemon {
                     finished.push(n);
                 }
             }
-            for n in finished.into_iter() {
+            for n in finished.into_iter().rev() {
                 let (_, thread) = state.dl_tasks.remove(n);
                 match thread.join().unwrap() {
                     Ok(media) => {
@@ -171,7 +173,7 @@ impl Daemon {
                     let dir = state.config.data.media_dir.to_string_lossy().to_string();
                     state
                         .dl_tasks
-                        .push((entry.clone(), dl::download_video(dir, entry.link)));
+                        .push((entry.clone(), dl::download_video(dir, entry)));
                 }
             }
             thread::sleep(Duration::from_millis(UPDATE_INTERVAL));

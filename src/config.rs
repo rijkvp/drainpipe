@@ -1,4 +1,4 @@
-use crate::{dl::MediaEntry, error::Error};
+use crate::{error::Error, media::MediaEntry};
 use chrono::{prelude::*, Duration};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -109,61 +109,5 @@ impl Default for DownloadFilter {
             before: None,
             after: None,
         }
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum SourceType {
-    Video,
-    Audio,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct Source {
-    pub url: String,
-    pub r#type: SourceType,
-}
-
-pub struct Sources {
-    path: PathBuf,
-    sources: Vec<Source>,
-    changed: bool,
-}
-
-impl Sources {
-    pub fn load(path: &Path) -> Result<Self, Error> {
-        info!("Loading sources from {path:?}");
-        let sources = crate::file::load_or_create::<Vec<Source>>(path)?;
-        Ok(Self {
-            path: path.to_path_buf(),
-            sources,
-            changed: false,
-        })
-    }
-
-    pub fn reload(&mut self) -> Result<(), Error> {
-        self.sources = crate::file::load::<Vec<Source>>(&self.path)?;
-        self.changed = true;
-        Ok(())
-    }
-
-    pub fn get(&self) -> Vec<Source> {
-        self.sources.clone()
-    }
-
-    pub fn set(&mut self, sources: Vec<Source>) -> Result<(), Error> {
-        self.sources = sources;
-        crate::file::save(&self.sources, &self.path)?;
-        self.changed = true;
-        Ok(())
-    }
-
-    pub fn changed(&mut self) -> bool {
-        if self.changed {
-            self.changed = false;
-            return true;
-        }
-        false
     }
 }

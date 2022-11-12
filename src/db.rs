@@ -1,7 +1,7 @@
-use crate::{dl::Media, error::Error};
+use crate::{error::Error, media::Media};
 use sqlx::{sqlite::SqliteConnectOptions, FromRow, SqlitePool};
-use tracing::log::info;
 use std::path::Path;
+use tracing::log::info;
 
 #[derive(Clone)]
 pub struct Database {

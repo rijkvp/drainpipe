@@ -1,9 +1,10 @@
 use crate::{
-    config::{ConfigData, Source},
+    config::ConfigData,
     daemon::State,
     db::Database,
-    dl::{Media, MediaEntry},
     error::Error,
+    media::{Media, MediaEntry},
+    source::Source,
 };
 use axum::{
     body::{boxed, Full},

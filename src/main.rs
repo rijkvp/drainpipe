@@ -5,12 +5,16 @@ mod dl;
 mod error;
 mod file;
 mod gui;
+mod media;
+mod source;
 
 use owo_colors::OwoColorize;
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt().with_max_level(tracing::Level::INFO).init();
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .init();
 
     let d = match daemon::Daemon::start().await {
         Ok(d) => d,

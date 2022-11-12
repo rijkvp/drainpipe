@@ -1,9 +1,11 @@
-use crate::{config::Source, error::Error};
-use chrono::prelude::*;
-use feed_rs::{model::Entry as FeedEntry, parser};
+use crate::{
+    error::Error,
+    media::{Media, MediaEntry},
+    source::{Source, SourceType},
+};
+use feed_rs::parser;
 use futures::StreamExt;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use std::{
     process::Command,
     sync::Arc,
@@ -11,47 +13,6 @@ use std::{
 };
 use tokio::sync::Mutex;
 use tracing::{debug, error};
-
-#[derive(Debug, Clone, Serialize)]
-pub struct MediaEntry {
-    pub title: Option<String>,
-    pub link: String,
-    pub published: Option<DateTime<Utc>>,
-}
-
-impl PartialEq for MediaEntry {
-    fn eq(&self, other: &Self) -> bool {
-        self.link == other.link
-    }
-}
-
-impl TryFrom<FeedEntry> for MediaEntry {
-    type Error = Error;
-
-    fn try_from(e: FeedEntry) -> Result<Self, Self::Error> {
-        Ok(Self {
-            title: e.title.map(|t| t.content),
-            published: e.published,
-            link: e
-                .links
-                .get(0)
-                .ok_or_else(|| Error::Custom("No link on entry!".to_string()))?
-                .href
-                .clone(),
-        })
-    }
-}
-
-#[derive(sqlx::FromRow, Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Media {
-    #[serde(alias = "webpage_url")]
-    pub source: String,
-    pub id: String,
-    #[serde(alias = "filename")]
-    pub path: String,
-    pub title: String,
-    pub description: String,
-}
 
 pub async fn crawl_sources(sources: Vec<Source>) -> Vec<MediaEntry> {
     debug!("Crawling feeds from {} sources..", sources.len());
@@ -62,7 +23,7 @@ pub async fn crawl_sources(sources: Vec<Source>) -> Vec<MediaEntry> {
             let client = client.clone();
             let items = items.clone();
             async move {
-                match get_feed_downloads(client, &source.url).await {
+                match get_source_entries(client, source).await {
                     Ok(m) => items.lock().await.extend(m),
                     Err(e) => error!("Failed to get downloads for '{}': {e}", source.url),
                 }
@@ -75,36 +36,48 @@ pub async fn crawl_sources(sources: Vec<Source>) -> Vec<MediaEntry> {
     items
 }
 
-async fn get_feed_downloads(client: Client, url: &str) -> Result<Vec<MediaEntry>, Error> {
-    let response = client.get(url).send().await?.error_for_status()?;
+async fn get_source_entries(client: Client, source: &Source) -> Result<Vec<MediaEntry>, Error> {
+    let response = client.get(&source.url).send().await?.error_for_status()?;
     let xml = response.text().await?;
     let feed = parser::parse(xml.as_bytes())?;
     let mut items = Vec::new();
     for entry in feed.entries {
-        let dl = MediaEntry::try_from(entry)?;
+        let dl = MediaEntry::from_feed_entry(entry, source.r#type.clone())?;
         items.push(dl);
     }
-    debug!("Feed: got {} entries from {}", items.len(), url);
+    debug!("Feed: got {} entries from {}", items.len(), source.url);
     Ok(items)
 }
 
-pub fn download_video(dir: String, url: String) -> JoinHandle<Result<Media, String>> {
-    // TODO: Different downloaders
-    thread::spawn(move || -> Result<Media, String> {
-        let output = Command::new("yt-dlp")
-            .args([
+fn dl_format(dl_type: SourceType) -> Vec<&'static str> {
+    match dl_type {
+        SourceType::Video => {
+            vec![
                 "-f",
                 "(bv[vcodec^=vp9][height<=1080]/bv[height<=1080]/bv)+(ba[acodec=opus]/ba/b)",
                 "--merge-output-format",
                 "mkv",
-                "--print",
-                "%()j",
-                "--no-simulate",
-                "--no-progress",
-                "-o",
-                &(dir + "/%(artist,channel,uploader|Unkown)s/%(release_date>%Y%m%d,upload_date>%Y%m%d)s-%(fulltitle)s.%(ext)s"),
-                &url,
-            ])
+            ]
+        }
+        SourceType::Audio => vec!["-f", "ba[acodec=opus]/ba/b", "--extract-audio", "--audio-format", "opus"],
+    }
+}
+
+pub fn download_video(dir: String, entry: MediaEntry) -> JoinHandle<Result<Media, String>> {
+    thread::spawn(move || -> Result<Media, String> {
+        let output = Command::new("yt-dlp")
+            .args([
+                dl_format(entry.r#type),
+                vec![
+                    "--print",
+                    "%()j",
+                    "--no-simulate",
+                    "--no-progress",
+                    "-o",
+                    &(dir + "/%(artist,channel,uploader|Unkown)s/%(release_date>%Y%m%d,upload_date>%Y%m%d)s-%(fulltitle)s.%(ext)s"),
+                    &entry.link,
+                ]
+            ].concat())
             .output()
             .map_err(|e| format!("Failed execute yt-dlp: {e}"))?;
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
