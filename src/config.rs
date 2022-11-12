@@ -74,21 +74,21 @@ pub struct DownloadFilter {
     #[serde(with = "crate::file::dhms_duration_option")]
     pub max_age: Option<Duration>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub before: Option<DateTime<Utc>>,
+    pub before: Option<NaiveDate>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub after: Option<DateTime<Utc>>,
+    pub after: Option<NaiveDate>,
 }
 
 impl DownloadFilter {
     pub fn filter(&self, entry: &MediaEntry) -> bool {
         if let Some(published) = entry.published {
             if let Some(before) = self.before {
-                if published > before {
+                if published > DateTime::<Utc>::from_local(before.and_hms(0, 0, 0), Utc) {
                     return true;
                 }
             }
             if let Some(after) = self.after {
-                if published < after {
+                if published < DateTime::<Utc>::from_local(after.and_hms(0, 0, 0), Utc) {
                     return true;
                 }
             }
