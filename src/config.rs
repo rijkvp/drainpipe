@@ -10,24 +10,24 @@ use tracing::info;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ConfigData {
+    pub address: IpAddr,
+    pub port: u16,
     pub sync_interval: u64,
     pub parallel_downloads: u64,
     pub media_dir: PathBuf,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub download_filter: Option<DownloadFilter>,
-    pub port: u16,
-    pub address: IpAddr,
 }
 
 impl Default for ConfigData {
     fn default() -> Self {
         Self {
+            address: Ipv4Addr::UNSPECIFIED.into(),
+            port: 9193,
             sync_interval: 900,
             parallel_downloads: 1,
             media_dir: dirs::home_dir().unwrap().join("media"),
-            download_filter: None,
-            port: 9193,
-            address: Ipv4Addr::UNSPECIFIED.into(),
+            download_filter: Some(DownloadFilter::default()),
         }
     }
 }
@@ -83,12 +83,15 @@ impl DownloadFilter {
     pub fn filter(&self, entry: &MediaEntry) -> bool {
         if let Some(published) = entry.published {
             if let Some(before) = self.before {
-                if published > DateTime::<Utc>::from_local(before.and_hms(0, 0, 0), Utc) {
+                if published
+                    > DateTime::<Utc>::from_local(before.and_hms_opt(0, 0, 0).unwrap(), Utc)
+                {
                     return true;
                 }
             }
             if let Some(after) = self.after {
-                if published < DateTime::<Utc>::from_local(after.and_hms(0, 0, 0), Utc) {
+                if published < DateTime::<Utc>::from_local(after.and_hms_opt(0, 0, 0).unwrap(), Utc)
+                {
                     return true;
                 }
             }
@@ -105,7 +108,7 @@ impl DownloadFilter {
 impl Default for DownloadFilter {
     fn default() -> Self {
         Self {
-            max_age: Some(Duration::days(7)),
+            max_age: Some(Duration::days(30)),
             before: None,
             after: None,
         }
