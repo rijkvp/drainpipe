@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 url = "2.3"
 scraper = "0.13"
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing = "0.1"
 envy = "0.4"
 sqlx = { version = "0.6", features = ["runtime-tokio-rustls", "sqlite"] }

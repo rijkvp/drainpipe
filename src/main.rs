@@ -9,11 +9,18 @@ mod media;
 mod source;
 
 use owo_colors::OwoColorize;
+use tracing_subscriber::{filter::EnvFilter, fmt, prelude::*};
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
+    let filter = EnvFilter::builder()
+        .with_default_directive("drainpipe=INFO".parse().unwrap())
+        .with_env_var("DRAINPIPE_LOG")
+        .from_env()
+        .unwrap();
+    tracing_subscriber::registry()
+        .with(fmt::layer().with_target(false))
+        .with(filter)
         .init();
 
     let d = match daemon::Daemon::start().await {
