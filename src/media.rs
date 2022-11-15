@@ -42,4 +42,5 @@ pub struct Media {
     pub path: String,
     pub title: String,
     pub description: String,
+    pub date: i64,
 }

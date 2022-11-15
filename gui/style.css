@@ -4,7 +4,7 @@
   --primary: #0f6dff;
   --bg0: #eaeaf5;
   --bg1: #dadae6;
-  --input-hover: #d9d9ec;
+  --bg2: #cbcbd6;
   --border: #b8b8c7;
   --fg0: #1c1c1e;
   --select-icon-url: url("data:image/svg+xml,%3Csvg width='292' height='292' viewBox='0 0 292 292' xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink'%3E%3Cpath id='Path' fill='%23222222' stroke='none' d='M 287 69 C 283.606537 65.469971 278.895844 63.513214 274 63.600006 L 18.4 63.600006 C 13.4 63.600006 9.1 65.400009 5.5 69 C 1.984143 72.328568 -0.005267 76.958466 -0 81.800003 C -0 86.800003 1.8 91.100006 5.4 94.699997 L 133.399994 222.600006 C 137 226.200012 141.199997 228 146.199997 228 C 151.199997 228 155.399994 226.200012 159 222.600006 L 287 94.600006 C 290.5 91.100006 292.399994 86.800003 292.399994 81.800003 C 292.399994 76.800003 290.5 72.600006 286.899994 69 Z'/%3E%3C/svg%3E");
@@ -14,8 +14,8 @@
   :root {
     --primary: #4589ee;
     --bg0: #0f0f11;
-    --bg1: #222228;
-    --input-hover: #282830;
+    --bg1: #1a1a1e;
+    --bg2: #222228;
     --border: #44444b;
     --fg0: #efeffa;
     --select-icon-url: url("data:image/svg+xml,%3Csvg width='292' height='292' viewBox='0 0 292 292' xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink'%3E%3Cpath id='Path' fill='%23ffffff' stroke='none' d='M 287 69 C 283.606537 65.469971 278.895844 63.513214 274 63.600006 L 18.4 63.600006 C 13.4 63.600006 9.1 65.400009 5.5 69 C 1.984143 72.328568 -0.005267 76.958466 -0 81.800003 C -0 86.800003 1.8 91.100006 5.4 94.699997 L 133.399994 222.600006 C 137 226.200012 141.199997 228 146.199997 228 C 151.199997 228 155.399994 226.200012 159 222.600006 L 287 94.600006 C 290.5 91.100006 292.399994 86.800003 292.399994 81.800003 C 292.399994 76.800003 290.5 72.600006 286.899994 69 Z'/%3E%3C/svg%3E");
@@ -40,11 +40,11 @@ h1 {
 }
 
 h2 {
-  font-size: 2rem;
+  font-size: 2.2rem;
 }
 
 h3 {
-  font-size: 1.75rem;
+  font-size: 1.7rem;
 }
 
 h1,
@@ -141,7 +141,7 @@ button {
 }
 
 input:hover, select:hover, button:hover {
-  background-color: var(--input-hover);
+  background-color: var(--bg2);
 }
 
 select {
@@ -196,11 +196,64 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 main {
-  max-width: 800px;
+  max-width: 900px;
   margin: 40px auto;
   padding: 0 20px;
 }
 
 .remove-btn {
   cursor: pointer;
+}
+
+/* LAYOUT */
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.row > div {
+  margin-right: 1rem;
+}
+
+.media-list {
+  border-radius: var(--border-radius);
+  background-color: var(--bg1);
+  padding: 12px;
+  max-height: 600px;
+  width: 400px;
+  overflow: auto;
+}
+
+.media-item {
+  border-radius: var(--border-radius);
+  padding: 6px;
+  background-color: var(--bg1);
+}
+
+.media-title {
+  font-weight: bold;
+}
+
+.media-item:nth-child(odd) {
+  background-color: var(--bg2);
+}
+
+.grid2 {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  column-gap: 1rem;
+  row-gap: 0.4rem;
+  align-items: center;
+}
+
+.grid2 > label {
+  font-weight: bold;
+}
+
+@media (min-width: 500px) {
+  .grid2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }

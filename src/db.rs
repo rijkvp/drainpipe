@@ -25,7 +25,8 @@ impl Database {
                 id          TEXT NOT NULL,
                 path        TEXT NOT NULL,
                 title       TEXT,
-                description TEXT
+                description TEXT,
+                date        INT NOT NULL
             )",
         )
         .execute(&mut conn)
@@ -38,8 +39,8 @@ impl Database {
         let mut conn = self.pool.acquire().await?;
         sqlx::query(
             "
-            INSERT INTO media (source, id, path, title, description)
-            VALUES (?1, ?2, ?3, ?4, ?5)
+            INSERT INTO media (source, id, path, title, description, date)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
         ",
         )
         .bind(&media.source)
@@ -47,6 +48,7 @@ impl Database {
         .bind(&media.path)
         .bind(&media.title)
         .bind(&media.description)
+        .bind(&media.date)
         .execute(&mut conn)
         .await?;
 

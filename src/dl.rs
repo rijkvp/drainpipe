@@ -3,9 +3,11 @@ use crate::{
     media::{Media, MediaEntry},
     source::{Source, SourceType},
 };
+use chrono::Utc;
 use feed_rs::parser;
 use futures::StreamExt;
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use std::{
     process::Command,
     sync::Arc,
@@ -59,7 +61,37 @@ fn dl_format(dl_type: SourceType) -> Vec<&'static str> {
                 "mkv",
             ]
         }
-        SourceType::Audio => vec!["-f", "ba[acodec=opus]/ba/b", "--extract-audio", "--audio-format", "opus"],
+        SourceType::Audio => vec![
+            "-f",
+            "ba[acodec=opus]/ba/b",
+            "--extract-audio",
+            "--audio-format",
+            "opus",
+        ],
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct DownloadInfo {
+    #[serde(alias = "webpage_url")]
+    pub source: String,
+    pub id: String,
+    #[serde(alias = "filename")]
+    pub path: String,
+    pub title: String,
+    pub description: String,
+}
+
+impl DownloadInfo {
+    fn into_media(self) -> Media {
+        Media {
+            source: self.source,
+            id: self.id,
+            path: self.path,
+            title: self.title,
+            description: self.description, 
+            date: Utc::now().timestamp(),
+        }
     }
 }
 
@@ -69,6 +101,9 @@ pub fn download_video(dir: String, entry: MediaEntry) -> JoinHandle<Result<Media
             .args([
                 dl_format(entry.r#type),
                 vec![
+                    "--embed-thumbnail",
+                    "--embed-metadata",
+                    "--embed-info-json",
                     "--print",
                     "%()j",
                     "--no-simulate",
@@ -83,9 +118,9 @@ pub fn download_video(dir: String, entry: MediaEntry) -> JoinHandle<Result<Media
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         if output.status.success() {
-            let info = serde_json::from_str::<Media>(&stdout)
+            let info = serde_json::from_str::<DownloadInfo>(&stdout)
                 .map_err(|e| format!("Failed to parse JSON: {e}"))?;
-            Ok(info)
+            Ok(info.into_media())
         } else {
             Err(format!("YT-DLP failed:\n{stderr}\n{stdout}",))
         }

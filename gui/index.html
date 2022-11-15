@@ -1,64 +1,70 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Drainpipe</title>
-    <link rel="icon" href="data:," /> 
-    <link rel="stylesheet" href="style.css" />
-    <script src="main.js" defer></script>
-  </head>
-  <body>
-    <main>
-      <h1>Drainpipe</h1>
 
-      <h2>Status</h2>
-      <h3>Tasks</h3>
-      <ul id="tasks"></ul>
-      <h3>Queue</h3>
-      <ul id="queue"></ul>
-      <h3>Library</h3>
-      <ul id="library"></ul>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Drainpipe</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="style.css" />
+  <script src="main.js" defer></script>
+</head>
 
-      <h2>Sources</h2>
+<body>
+  <main>
+    <h1>Drainpipe</h1>
+
+    <div class="row">
       <div>
-        <table id="sources"></table>
-        <div>
-          <input
-            type="text"
-            id="source-url"
-            placeholder="Channel/feed URL">
-          <select id="source-type" required>
-            <option value="video">Video</option>
-            <option value="audio">Audio</option>
-          </select>
-          <button id="source-add">Add source</button>
-        </div>
+        <h3>Library</h3>
+        <div id="library" class="media-list"></div>
       </div>
-
-
-      <h2>Configuration</h2>
       <div>
-        <label for="config:sync_interval">Sync interval (seconds)</label>
-        <input type="number" name="config:sync_interval" id="config:sync_interval" min="10" required>
-        <label for="config:parallel_downloads">Parallel downloads</label>
-        <input type="number" name="config:parallel_downloads" id="config:parallel_downloads" min="1" max="32" required>
-        <label for="config:media_dir">Media directory</label>
-        <input type="text" id="config:media_dir" placeholder="/path/to/media/dir" required>
-        <label for="config:address">GUI IP Address (requires restart)</label>
-        <input type="text" name="config:address" id="config:address" required>
-        <label for="config:port">GUI Port (requires restart)</label>
-        <input type="number" name="config:port" id="config:port" min="1024" max="65535" required>
-        <h3>Download filter</h3>
-        <label for="config:download_filter.max_age">Max age</label>
-        <input type="text" name="config:download_filter.max_age" id="config:download_filter.max_age" placeholder="time in xdxhxmxs">
-        <label for="config:download_filter.before">Before</label>
-        <input type="date" name="config:download_filter.before" id="config:download_filter.before">
-        <label for="config:download_filter.after">After</label>
-        <input type="date" name="config:download_filter.after" id="config:download_filter.after">
-        <br>
-        <button id="config-save">Save config</button>
+        <h3>Queue</h3>
+        <div id="tasks" class="media-list"></div>
+        <div id="queue" class="media-list"></div>
       </div>
-    </main>
-  </body>
+    </div>
+
+    <h2>Sources</h2>
+    <div>
+      <table id="sources"></table>
+      <div>
+        <input type="text" id="source-url" placeholder="Channel/feed URL">
+        <select id="source-type" required>
+          <option value="video">Video</option>
+          <option value="audio">Audio</option>
+        </select>
+        <button id="source-add">Add source</button>
+      </div>
+    </div>
+
+
+    <h2>Configuration</h2>
+    <div class="grid2">
+      <label for="config:sync_interval">Sync interval (seconds)</label>
+      <input type="number" name="config:sync_interval" id="config:sync_interval" min="10" required>
+      <label for="config:parallel_downloads">Parallel downloads</label>
+      <input type="number" name="config:parallel_downloads" id="config:parallel_downloads" min="1" max="32" required>
+      <label for="config:media_dir">Media directory</label>
+      <input type="text" id="config:media_dir" placeholder="/path/to/media/dir" required>
+      <label for="config:address">GUI IP Address (requires restart)</label>
+      <input type="text" name="config:address" id="config:address" required>
+      <label for="config:port">GUI Port (requires restart)</label>
+      <input type="number" name="config:port" id="config:port" min="1024" max="65535" required>
+    </div>
+    <h3>Download filter</h3>
+    <div class="grid2">
+      <label for="config:download_filter.max_age">Max age</label>
+      <input type="text" name="config:download_filter.max_age" id="config:download_filter.max_age"
+        placeholder="time in xdxhxmxs">
+      <label for="config:download_filter.before">Before</label>
+      <input type="date" name="config:download_filter.before" id="config:download_filter.before">
+      <label for="config:download_filter.after">After</label>
+      <input type="date" name="config:download_filter.after" id="config:download_filter.after">
+      <button id="config-save">Save config</button>
+    </div>
+  </main>
+</body>
+
 </html>

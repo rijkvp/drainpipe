@@ -9,18 +9,21 @@ class Status {
     this.#queueContainer.innerHTML = '';
     this.#libraryContainer.innerHTML = '';
     this.#state.tasks.forEach((e) => {
-      const item = document.createElement('li');
-      item.innerHTML = `${e.title} (${e.link})`;
+      const item = document.createElement('div');
+      item.className = 'media-item';
+      item.innerHTML = `<div class="media-title">${e.title}</div><div>${e.link}</div>`;
       this.#tasksContainer.appendChild(item);
     });
     this.#state.queue.forEach((e) => {
-      const item = document.createElement('li');
-      item.innerHTML = `${e.title} (${e.link})`;
+      const item = document.createElement('div');
+      item.className = 'media-item';
+      item.innerHTML = `<div class="media-title">${e.title}</div><div>${e.link}</div>`;
       this.#queueContainer.appendChild(item);
     });
     this.#state.library.forEach((e) => {
-      const item = document.createElement('li');
-      item.innerHTML = `${e.title}`;
+      const item = document.createElement('div');
+      item.className = 'media-item';
+      item.innerHTML = `<div class="media-title">${e.title}</div>`;
       this.#libraryContainer.appendChild(item);
     });
   }
