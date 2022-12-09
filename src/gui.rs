@@ -45,7 +45,7 @@ pub fn start(port: u16, db: Arc<Database>, state: Arc<Mutex<State>>) {
 }
 
 #[derive(RustEmbed)]
-#[folder = "gui/"]
+#[folder = "gui-dist/"]
 struct StaticFile;
 
 async fn handler(uri: Uri) -> Response {

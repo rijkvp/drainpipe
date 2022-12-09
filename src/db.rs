@@ -48,7 +48,7 @@ impl Database {
         .bind(&media.path)
         .bind(&media.title)
         .bind(&media.description)
-        .bind(&media.date)
+        .bind(media.date)
         .execute(&mut conn)
         .await?;
 

@@ -221,10 +221,10 @@ class Config {
 
 }
 
-const status = new Status();
+const status2 = new Status();
 const sources = new Sources();
 const config = new Config();
-status.load();
+status2.load();
 sources.load();
 config.load();
 

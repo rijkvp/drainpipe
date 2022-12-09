@@ -1,0 +1,12 @@
+{
+  "name": "drainpipe",
+  "source": "gui/index.html",
+  "license": "GPL-3.0-only",
+  "scripts": {
+    "start": "parcel watch --dist-dir gui-dist",
+    "build": "parcel build --no-content-hash --no-source-maps --dist-dir gui-dist"
+  },
+  "devDependencies": {
+    "parcel": "^2.8.1"
+  }
+}
